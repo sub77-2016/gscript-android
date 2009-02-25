@@ -35,10 +35,12 @@ public class GScript extends ListActivity {
 		MenuItem itmAdd = menu.add(0, mnuAddItem, 0, "Add script");
 		{
 			  itmAdd.setAlphabeticShortcut('a');
+			  itmAdd.setIcon(R.drawable.gscript_add);
 		}
 		MenuItem itmInfo = menu.add(0, mnuInfo, 0, "Caution information");
 		{
 			  itmInfo.setAlphabeticShortcut('c');
+			  itmInfo.setIcon(R.drawable.gscript_info);
 		}
 		
 		return super.onCreateOptionsMenu(menu);
