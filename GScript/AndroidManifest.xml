@@ -3,7 +3,7 @@
       package="nl.rogro.GScript"
       android:versionCode="1"
       android:versionName="1.0.0">
-    <application android:icon="@drawable/icon" android:label="@string/app_name">
+    <application android:icon="@drawable/icon" android:label="@string/app_name" android:description="@string/app_description">
         <activity android:name=".GScript"
                   android:label="@string/app_name">
             <intent-filter>
