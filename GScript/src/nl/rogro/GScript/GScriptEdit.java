@@ -1,8 +1,12 @@
 package nl.rogro.GScript;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+
 import android.app.Activity;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
@@ -19,9 +23,43 @@ public class GScriptEdit extends Activity {
 	EditText EditTextName;
 	EditText EditTextScript;
 	CheckBox CheckboxSu;
-	
+
 	protected static int EditScriptId;
 	ContentValues updateValues;
+
+	protected static final int ACTIVITY_LOAD_FILE = 9999;
+	
+	//Activity load file
+	@Override
+	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+		super.onActivityResult(requestCode, resultCode, data);
+		if(requestCode==ACTIVITY_LOAD_FILE && resultCode==Activity.RESULT_OK)
+		{
+			String loadFileName = "";
+			
+			try {
+
+			loadFileName = "/sdcard/" + data.getStringExtra("FileToLoad");
+			String Script = "";
+			
+  	        BufferedReader in = new BufferedReader(new FileReader(loadFileName));
+  	        String str;
+  	        
+  	        while ((str = in.readLine()) != null) {
+  	        	Script += str;
+  	        }
+  	        in.close();
+			
+			EditTextScript.setText(Script.toString());
+			
+
+			} catch (Exception ex) {
+				Toast toast = Toast.makeText(this, "Error while loading script file " + loadFileName, Toast.LENGTH_LONG);
+				toast.show();
+			}
+		}
+	}	
+	
 	
 	/** Database */
 	protected static class DatabaseHelper extends SQLiteOpenHelper {
@@ -73,6 +111,17 @@ public class GScriptEdit extends Activity {
 			}
 
 		});
+		
+		Button btnLoadFile = (Button) findViewById(R.id.ButtonEditLoad);
+		btnLoadFile.setOnClickListener(
+				new OnClickListener()
+				{
+					public void onClick(View v) {
+		                Intent i = new Intent(GScriptEdit.this, GScriptLoad.class);
+		                startActivityForResult(i, ACTIVITY_LOAD_FILE);
+					}
+				}
+		);
 		
 		Button btnSave = (Button) findViewById(R.id.ButtonEditSave);
 		btnSave.setOnClickListener(

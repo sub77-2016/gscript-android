@@ -98,11 +98,11 @@ public class GScriptExec extends Activity {
 		streamOutput.flush();
 		
 		} catch (Exception e) {
-
 			toast = Toast.makeText(this, "Error: \n\n" + e.getMessage(), Toast.LENGTH_LONG);
 		    toast.show();
 		}
 
+		setResult(android.app.Activity.RESULT_OK);
 		finish();
 	
 	}
