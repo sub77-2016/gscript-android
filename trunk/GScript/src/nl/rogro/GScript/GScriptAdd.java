@@ -44,7 +44,7 @@ public class GScriptAdd extends Activity {
   	        String str;
   	        
   	        while ((str = in.readLine()) != null) {
-  	        	Script += str;
+  	        	Script += str + "\n";
   	        }
   	        in.close();
 			
