@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+
+
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_height="fill_parent" android:layout_width="fill_parent" android:padding="6px" android:orientation="vertical">
+<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="20px" android:text="Select a file ( .sh from sdcard )"></TextView>
+<ListView android:id="@+id/ListViewFiles" android:layout_width="fill_parent" android:layout_weight="1.0" android:layout_height="wrap_content" android:drawSelectorOnTop="false" android:choiceMode="singleChoice"></ListView>
+<LinearLayout android:layout_height="wrap_content" android:layout_width="fill_parent">
+<Button android:layout_height="wrap_content" android:id="@+id/ButtonFileCancel" android:text="Cancel" android:layout_width="fill_parent"></Button>
+</LinearLayout>
+</LinearLayout>
