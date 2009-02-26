@@ -1,6 +1,7 @@
 package nl.rogro.GScript;
 
-import java.io.DataOutputStream;
+import java.io.FileWriter;
+
 import android.app.ListActivity;
 import android.content.Context;
 import android.content.Intent;
@@ -8,6 +9,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.os.Bundle;
+import android.os.Parcelable;
 import android.view.*;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.view.View.OnCreateContextMenuListener;
@@ -16,17 +18,22 @@ import android.widget.AdapterView.AdapterContextMenuInfo;
 import android.widget.AdapterView.OnItemClickListener;
 
 public class GScript extends ListActivity {
+	
 	LayoutInflater mInflater;
 	Cursor mCursor;
 	SQLiteDatabase mDatabase;
 	ScriptsAdapter mAdapter;
 	ListView mListView;
+	boolean CreateShortcut = false;
 
 	public static final int mnuAddItem = Menu.FIRST + 1;
 	public static final int mnuEditItem = Menu.FIRST + 2;
 	public static final int mnuDeleteItem = Menu.FIRST + 3;
-	public static final int mnuRunItem = Menu.FIRST + 4;
-	public static final int mnuInfo = Menu.FIRST + 5;
+	public static final int mnuSaveItem = Menu.FIRST + 4;	
+	public static final int mnuRunItem = Menu.FIRST + 5;
+	public static final int mnuInfo = Menu.FIRST + 6;
+	
+	public static final String SCRIPT_KEY = "nl.rogro.GScript.GScript.ScriptId";
 	
 	@Override 
 	public boolean onCreateOptionsMenu(Menu menu) {
@@ -68,24 +75,34 @@ public class GScript extends ListActivity {
 		
 		return super.onOptionsItemSelected(item);
 	}	
+	
 	@Override 
 	public boolean onContextItemSelected(MenuItem item) 
     {
 		AdapterContextMenuInfo info = (AdapterContextMenuInfo) item.getMenuInfo();
 		int itemId = Integer.valueOf(String.valueOf(info.position));
+
+		mCursor.moveToPosition(itemId);
+		int ScriptId = mCursor.getInt(0);
 		
-		if(item.getItemId()==mnuRunItem)
+		switch(item.getItemId())
 		{
-		    ExecuteScript(itemId);
+		case mnuRunItem:
+			ExecuteScript(ScriptId);
+			break;
+		case mnuDeleteItem:
+			DeleteScript(ScriptId);
+			break;
+		case mnuEditItem:
+			EditScript(ScriptId);
+			break;
+		case mnuSaveItem:
+			SaveScript(ScriptId);
+			break;
 		}
-		if(item.getItemId()==mnuDeleteItem)
-		{
-			DeleteScript(itemId);
-		}
-		if(item.getItemId()==mnuEditItem)
-		{
-			EditScript(itemId);
-		}
+
+		refreshCursor();
+		
     	return super.onContextItemSelected(item);
     }
 	
@@ -147,7 +164,6 @@ public class GScript extends ListActivity {
 		mCursor = mDatabase.query(false, "scripts", new String[] { "_id", "name", "script", "su" }, null, null, null, null, null, null);
 		mAdapter = new ScriptsAdapter(this, mCursor);
 		setListAdapter(mAdapter);
-		//updateEmptyText();
 	}
 
 	@Override
@@ -161,6 +177,24 @@ public class GScript extends ListActivity {
     protected void onCreate(Bundle savedInstanceState)
 	{
         super.onCreate(savedInstanceState);
+        
+		final Intent intent = getIntent();
+        final String action = intent.getAction();
+
+        //Launched as ACTION_CREATE_SHORTCUT
+        if (Intent.ACTION_CREATE_SHORTCUT.equals(action)) {
+        	CreateShortcut = true;
+        } else {
+        	CreateShortcut = false;
+        }
+        //intent has SCRIPT_KEY so just launch the specified script        
+        if (intent.getIntExtra(SCRIPT_KEY, 0)!=0)
+        {
+        	ExecuteScript(intent.getIntExtra(SCRIPT_KEY, 0));
+        	setResult(RESULT_OK, intent);
+        	finish();
+        }
+        
         setContentView(R.layout.main);
         
         mListView = (ListView) findViewById(android.R.id.list);
@@ -171,98 +205,139 @@ public class GScript extends ListActivity {
 
         refreshCursor();
         
+        //Listview Context
         mListView.setOnCreateContextMenuListener(
         		new OnCreateContextMenuListener()
         		{
 					public void onCreateContextMenu(ContextMenu menu, View v,
 							ContextMenuInfo menuInfo) {
-						menu.add(0, mnuRunItem, 0, "Run");
+						if(!CreateShortcut)
+						{
+							menu.add(0, mnuRunItem, 0, "Run");
+						} else {
+							menu.add(0, mnuRunItem, 0, "Select");
+						}
 						menu.add(0, mnuEditItem, 0, "Edit");
 						menu.add(0, mnuDeleteItem, 0, "Delete");
+						menu.add(0, mnuSaveItem, 0, "Save to SD");
 						menu.add(0, 999, 0, "Cancel");
 
 					}
         		}
         );
+        
+        //Listview clicked
         mListView.setOnItemClickListener(
         		new OnItemClickListener()
         		{
 					public void onItemClick(AdapterView<?> parent, View view,
 							int position, long id) {
-						ExecuteScript(position);
+						
+						//Execute the selected script
+						mCursor.moveToPosition(position);
+						int ScriptId = mCursor.getInt(0);
+						
+						ExecuteScript(ScriptId);
+						
+						refreshCursor();
 					}
         		}
      	);
 	}
 	
+	/**Add a new script -> GScriptAdd*/
 	void AddScript()
 	{
 		Intent i = new Intent(GScript.this, GScriptAdd.class);
 		startActivity(i);
 	}
 	
-	void EditScript(int ScriptNr)
+	/**Edit a script -> GScriptEdit*/
+	void EditScript(int ScriptId)
 	{
-		mCursor.moveToPosition(ScriptNr);
-		int ScriptId = mCursor.getInt(0);
-		refreshCursor();
-		
+		//Edit selected script
 		GScriptEdit.EditScriptId = ScriptId;
-		
 		Intent i = new Intent(GScript.this, GScriptEdit.class);
 		startActivity(i);
 	}
 	
-	void DeleteScript(int ScriptNr)
+	/**Delete script*/
+	void DeleteScript(int ScriptId)
 	{
 		//Delete selected script
-		mCursor.moveToPosition(ScriptNr);
-		int ScriptId = mCursor.getInt(0);
-		
-		mDatabase.execSQL("DELETE FROM scripts WHERE _id = "+ScriptId);
+		mDatabase.execSQL("DELETE FROM scripts WHERE _id = " + ScriptId);
 		refreshCursor();
 	}
 	
-	void ExecuteScript(int ScriptNr)
+	/**Execute a script*/
+	void ExecuteScript(int ScriptId)
 	{
-		//Execute selected script
-		Toast toast; 
-
-		try 
+		if(!CreateShortcut)
 		{
-
-		mCursor.moveToPosition(ScriptNr);
-		
-		String Script = mCursor.getString(2); 
-		short Su = mCursor.getShort(3);
-		
-		toast = Toast.makeText(this, "Script is being executed in the background:\n\n"+ Script, Toast.LENGTH_LONG);
-	    toast.show();
-
-		Script += "\nexit\n";	    
-		
-		refreshCursor();
-			
-		Process process;
-				
-		if(Su==1)
-		{
-			process = Runtime.getRuntime().exec("su");			
+			//Execute selected script
+			Intent i = new Intent(GScript.this, GScriptExec.class);
+			i.putExtra(SCRIPT_KEY, ScriptId);
+			startActivity(i);
 		} else {
-			process = Runtime.getRuntime().exec("sh");		
+			//Create a shortcut to the specified script
+        	ShortcutToScript(ScriptId);
+            finish();
+            return;
 		}
-
-		DataOutputStream os = new DataOutputStream(process.getOutputStream());
-		os.writeBytes(Script);
-		os.flush();
-
-		} catch (Exception e) {
-
-			toast = Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG);
-		    toast.show();
-		    
-		}
-		
 	}
 	
+	/** Save script to sd card */
+	void SaveScript(int ScriptId)
+	{
+		try
+		{
+		
+		mCursor = mDatabase.query(false, "scripts", new String[] { "_id",
+				"name", "script", "su" }, "_id="+ScriptId, null, null, null, null, null);
+		
+		mCursor.moveToFirst();
+		String ScriptName = mCursor.getString(1);
+		String Script = mCursor.getString(2);
+		
+		FileWriter fileOutput = new FileWriter("/sdcard/" + ScriptName + ".sh");
+		fileOutput.write(Script);
+		fileOutput.flush();
+		fileOutput.close();
+		
+		} catch (Exception ex)
+		{
+			Toast toast = Toast.makeText(this, "Error while trying to save:\n\n" + ex.getMessage(), Toast.LENGTH_LONG);
+			toast.show();
+		}
+	
+	}
+	
+	/**Create shortcut for script*/
+	void ShortcutToScript(int ScriptId)
+	{
+
+		mCursor = mDatabase.query(false, "scripts", new String[] { "_id",
+				"name", "script", "su" }, "_id="+ScriptId, null, null, null, null, null);
+		
+		mCursor.moveToFirst();
+		String ScriptName = mCursor.getString(1);
+		refreshCursor();
+		
+		Intent executeIntent = new Intent(Intent.ACTION_MAIN);
+		executeIntent.setClassName(this, this.getClass().getName());
+		executeIntent.putExtra(SCRIPT_KEY, ScriptId);
+
+		Intent intentShortcut = new Intent();
+
+		intentShortcut.putExtra(Intent.EXTRA_SHORTCUT_INTENT, executeIntent);
+		intentShortcut.putExtra(Intent.EXTRA_SHORTCUT_NAME, ScriptName);
+		Parcelable iconResource = Intent.ShortcutIconResource.fromContext(this,
+				R.drawable.gscript_shortcut);
+		intentShortcut.putExtra(Intent.EXTRA_SHORTCUT_ICON_RESOURCE,
+				iconResource);
+
+		setResult(RESULT_OK, intentShortcut);
+		
+		
+	}
 }
