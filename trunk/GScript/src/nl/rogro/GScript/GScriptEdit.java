@@ -39,7 +39,7 @@ public class GScriptEdit extends Activity {
 			
 			try {
 
-			loadFileName = "/sdcard/" + data.getStringExtra("FileToLoad");
+			loadFileName = "/sdcard/gscript/" + data.getStringExtra("FileToLoad");
 			String Script = "";
 			
   	        BufferedReader in = new BufferedReader(new FileReader(loadFileName));

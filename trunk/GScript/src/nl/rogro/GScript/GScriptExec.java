@@ -36,7 +36,8 @@ public class GScriptExec extends Activity {
 
 	int ExecuteResponse = 999;
 	int ExecuteFinished = 1000;
-
+	String GScript_TempFile;
+	
 	
 	/** Database */
 	protected static class DatabaseHelper extends SQLiteOpenHelper {
@@ -60,7 +61,8 @@ public class GScriptExec extends Activity {
 		setContentView(R.layout.execitem);
 
 		Toast toast;
-
+		GScript_TempFile = this.getCacheDir() + "/gscript_tmp.sh";		
+		
 		final Intent intent = getIntent();
 		int ScriptId = intent.getIntExtra(GScript.SCRIPT_KEY, 0);
 
@@ -113,12 +115,14 @@ public class GScriptExec extends Activity {
 			}
 
 			// Create temporary file
-			FileWriter fileOutput = new FileWriter("/sdcard/gscript_tmp.sh");
+			
+			FileWriter fileOutput = new FileWriter(GScript_TempFile);
 			fileOutput.write(Script);
 			fileOutput.flush();
 			fileOutput.close();
 
 			executeThread = new ExecuteThread();
+			executeThread.GScript_TempFile = GScript_TempFile;
 			executeThread.start();
 
 		} catch (Exception e) {
@@ -143,6 +147,8 @@ public class GScriptExec extends Activity {
 	
 	class ExecuteThread extends Thread {
 
+	public String GScript_TempFile;
+		
 	public void run() {
 		Execute();
 	}
@@ -156,9 +162,10 @@ public class GScriptExec extends Activity {
 					String.class, String.class, String.class, int[].class);
 			Method waitFor = execClass.getMethod("waitFor", int.class);
 
+			
 			int[] pid = new int[1];
 			FileDescriptor fd = (FileDescriptor) createSubprocess.invoke(null,
-					"/system/bin/" + processName, "./sdcard/gscript_tmp.sh", null, pid);
+					"/system/bin/" + processName, this.GScript_TempFile, null, pid);
 
 			FileInputStream in = new FileInputStream(fd);
 			BufferedReader reader = new BufferedReader(
