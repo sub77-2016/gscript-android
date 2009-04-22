@@ -11,6 +11,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ListView;
+import android.widget.Toast;
 import android.widget.AdapterView.OnItemClickListener;
 
 public class GScriptLoad extends Activity {
@@ -25,11 +26,31 @@ public class GScriptLoad extends Activity {
 		
 		ArrayList<String> scriptFiles = new ArrayList<String>();
 
-		File[] files = new File("/sdcard/").listFiles();
+		
+		try
+		{
+
+			//check if folder exists
+			File gscript_folder = new File("/sdcard/gscript/");
+			
+			if(!gscript_folder.exists())
+			{
+				gscript_folder.mkdir();
+			}			
+			
+		File[] files = new File("/sdcard/gscript/").listFiles();
 		for (File file : files)
 		{
 			if(file.isFile() && file.getName().contains(".sh"))
 				scriptFiles.add(file.getName());
+		}
+		} catch (Exception ex)
+		{
+			//Error while trying to load from /sdcard/gscript/
+			Toast toast = Toast.makeText(this,
+					"GScript:\n\nError while looking for scripts in /sdcard/gscript/\n\n" + ex,
+					Toast.LENGTH_LONG);
+			toast.show();
 		}
 		
 		final ArrayAdapter<String> fileList = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, scriptFiles);

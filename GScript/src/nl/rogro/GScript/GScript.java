@@ -1,5 +1,6 @@
 package nl.rogro.GScript;
 
+import java.io.File;
 import java.io.FileWriter;
 
 import android.app.ListActivity;
@@ -32,6 +33,9 @@ public class GScript extends ListActivity {
 	public static final int mnuSaveItem = Menu.FIRST + 4;	
 	public static final int mnuRunItem = Menu.FIRST + 5;
 	public static final int mnuInfo = Menu.FIRST + 6;
+	public static final int mnuExport = Menu.FIRST + 7;
+	public static final int mnuImport = Menu.FIRST + 8;
+
 	
 	public static final String SCRIPT_KEY = "nl.rogro.GScript.GScript.ScriptId";
 	
@@ -49,6 +53,19 @@ public class GScript extends ListActivity {
 			  itmInfo.setAlphabeticShortcut('c');
 			  itmInfo.setIcon(R.drawable.gscript_info);
 		}
+		/*
+		MenuItem exportInfo = menu.add(0, mnuExport, 0, "Export to sdcard");
+		{
+			  itmInfo.setAlphabeticShortcut('e');
+			  itmInfo.setIcon(R.drawable.gscript_info);
+		}
+		MenuItem importInfo = menu.add(0, mnuImport, 0, "Import from sdcard");
+		{
+			  itmInfo.setAlphabeticShortcut('i');
+			  itmInfo.setIcon(R.drawable.gscript_info);
+		}
+		*/
+
 		
 		return super.onCreateOptionsMenu(menu);
 	}
@@ -71,6 +88,9 @@ public class GScript extends ListActivity {
 			
 			toast = Toast.makeText(this, CautionNotice, Toast.LENGTH_LONG);
 		    toast.show();
+		}
+		if(item.getItemId()==mnuExport)
+		{
 		}
 		
 		return super.onOptionsItemSelected(item);
@@ -299,7 +319,17 @@ public class GScript extends ListActivity {
 		String ScriptName = mCursor.getString(1);
 		String Script = mCursor.getString(2);
 		
-		FileWriter fileOutput = new FileWriter("/sdcard/" + ScriptName + ".sh");
+		
+		//check if folder exists
+		File gscript_folder = new File("/sdcard/gscript/");
+		
+		if(!gscript_folder.exists())
+		{
+			gscript_folder.mkdir();
+		}			
+		
+		
+		FileWriter fileOutput = new FileWriter("/sdcard/gscript/" + ScriptName + ".sh");
 		fileOutput.write(Script);
 		fileOutput.flush();
 		fileOutput.close();
