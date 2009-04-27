@@ -1,6 +1,7 @@
 package nl.rogro.GScript;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -48,8 +49,10 @@ public class GScriptAdd extends Activity {
   	        }
   	        in.close();
 			
+			String FileName = new File(loadFileName).getName();
+  	        
 			EditTextScript.setText(Script.toString());
-			
+			EditTextName.setText(FileName.replace(".sh",""));
 
 			} catch (Exception ex) {
 				Toast toast = Toast.makeText(this, "Error while loading script file " + loadFileName, Toast.LENGTH_LONG);
