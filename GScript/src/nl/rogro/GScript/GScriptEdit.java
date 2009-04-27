@@ -1,6 +1,7 @@
 package nl.rogro.GScript;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 
 import android.app.Activity;
@@ -49,10 +50,12 @@ public class GScriptEdit extends Activity {
   	        	Script += str + "\n";
   	        }
   	        in.close();
-			
-			EditTextScript.setText(Script.toString());
-			
 
+			String FileName = new File(loadFileName).getName();
+  	        
+			EditTextScript.setText(Script.toString());
+			EditTextName.setText(FileName.replace(".sh",""));
+			
 			} catch (Exception ex) {
 				Toast toast = Toast.makeText(this, "Error while loading script file " + loadFileName, Toast.LENGTH_LONG);
 				toast.show();

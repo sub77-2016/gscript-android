@@ -2,7 +2,6 @@ package nl.rogro.GScript;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.DataOutputStream;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -12,6 +11,8 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import android.app.Activity;
 import android.content.Context;
@@ -30,14 +31,16 @@ import android.widget.Toast;
 
 public class GScriptExec extends Activity {
 	SQLiteDatabase mDatabase;
-	EditText EditTextTerm;
 	ExecuteThread executeThread = new ExecuteThread();
-	String processName;
 
 	int ExecuteResponse = 999;
 	int ExecuteFinished = 1000;
-	String GScript_TempFile;
+	int ExecuteUpdateButton = 1001;
 	
+	String processName;
+	String GScript_TempFile;
+	Button ButtonExecClose;
+	EditText EditTextTerm;
 	
 	/** Database */
 	protected static class DatabaseHelper extends SQLiteOpenHelper {
@@ -60,6 +63,7 @@ public class GScriptExec extends Activity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.execitem);
 
+		
 		Toast toast;
 		GScript_TempFile = this.getCacheDir() + "/gscript_tmp.sh";		
 		
@@ -86,7 +90,16 @@ public class GScriptExec extends Activity {
 
 		EditTextTerm = (EditText) findViewById(R.id.EditTextTerm);
 		
-		Button ButtonExecClose = (Button)findViewById(R.id.ButtonExecClose);
+		EditTextTerm.setOnClickListener(
+				new OnClickListener()
+				{
+					public void onClick(View v) {
+						AutoClose=false;
+					}
+				}
+		);
+		
+		ButtonExecClose = (Button)findViewById(R.id.ButtonExecClose);
 		ButtonExecClose.setOnClickListener(
 				new OnClickListener()
 				{
@@ -105,7 +118,8 @@ public class GScriptExec extends Activity {
 
 			processName = "sh";
 
-			switch (Su) {
+			switch (Su) 
+			{
 			case 0:
 				processName = "sh";
 				break;
@@ -131,16 +145,56 @@ public class GScriptExec extends Activity {
 
 	}
 
+	Boolean AutoClose = true;
+	int AutoCloseSeconds = 3;
+	Timer AutoCloseTimer = new Timer();
+	class AutoCloseTimerTask extends TimerTask
+	{
+		@Override
+		public void run() 
+		{
+			if(AutoClose)
+			{
+			AutoCloseSeconds--;
+			messageHandler.sendMessage(Message.obtain(messageHandler, ExecuteUpdateButton, "Close ( Auto closing in " + AutoCloseSeconds + " seconds )")); 
+			
+			if(AutoCloseSeconds==0)
+			{
+				executeThread.stop();
+				setResult(Activity.RESULT_OK);
+				finish();
+			}
+			} else {
+				messageHandler.sendMessage(Message.obtain(messageHandler, ExecuteUpdateButton, "Close ( Auto closing canceled )"));
+				this.cancel();
+			}
+		}
+	}
+	
 	private Handler messageHandler = new Handler() {
-
-	      @Override
-		public void handleMessage(Message msg) {
+	    
+		@Override
+		public void handleMessage(Message msg) 
+		{
 	    	  if(msg.what==ExecuteResponse)
 	    	  {
 				EditTextTerm.setText(msg.obj.toString() + "\n");
 				EditTextTerm.scrollTo(0, EditTextTerm.getLineCount()*EditTextTerm.getLineHeight());
 	    	  }
-			super.handleMessage(msg);
+	    	  if(msg.what==ExecuteFinished)
+	    	  {
+
+	    		EditTextTerm.setText(EditTextTerm.getText().toString()+"\nScript finished!");
+				EditTextTerm.scrollTo(0, EditTextTerm.getLineCount()*EditTextTerm.getLineHeight());
+				
+				AutoCloseTimer.schedule(new AutoCloseTimerTask(), 1000, 1000);
+	    	  }
+	    	  if(msg.what==ExecuteUpdateButton)
+	    	  {
+	    		ButtonExecClose.setText(msg.obj.toString());
+	    	  }
+		 	  
+	    	  super.handleMessage(msg);
 		}
 
 	  };	
@@ -185,6 +239,8 @@ public class GScriptExec extends Activity {
 
 			waitFor.invoke(null, pid[0]);
 
+			messageHandler.sendMessage(Message.obtain(messageHandler, ExecuteFinished, "")); 
+			
 			FileOutputStream out = new FileOutputStream(fd);
 			BufferedWriter writer = new BufferedWriter(
 					new OutputStreamWriter(out));

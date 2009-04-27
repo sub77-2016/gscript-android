@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    
     <string name="app_name">GScript</string>
-
-<string name="app_description">Shell script launcher</string>
-
+	<string name="app_description">Shell script launcher</string>
 </resources>
