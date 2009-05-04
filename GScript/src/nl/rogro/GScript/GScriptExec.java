@@ -1,19 +1,10 @@
 package nl.rogro.GScript;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileDescriptor;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.Timer;
 import java.util.TimerTask;
-
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -36,12 +27,12 @@ public class GScriptExec extends Activity {
 	int ExecuteResponse = 999;
 	int ExecuteFinished = 1000;
 	int ExecuteUpdateButton = 1001;
-	
+
 	String processName;
-	String GScript_TempFile;
+	String processScript;
 	Button ButtonExecClose;
 	EditText EditTextTerm;
-	
+
 	/** Database */
 	protected static class DatabaseHelper extends SQLiteOpenHelper {
 		public DatabaseHelper(Context context) {
@@ -63,10 +54,8 @@ public class GScriptExec extends Activity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.execitem);
 
-		
 		Toast toast;
-		GScript_TempFile = this.getCacheDir() + "/gscript_tmp.sh";		
-		
+
 		final Intent intent = getIntent();
 		int ScriptId = intent.getIntExtra(GScript.SCRIPT_KEY, 0);
 
@@ -85,41 +74,36 @@ public class GScriptExec extends Activity {
 
 			finish();
 		}
-		
+
 		eCursor.moveToFirst();
 
 		EditTextTerm = (EditText) findViewById(R.id.EditTextTerm);
-		
-		EditTextTerm.setOnClickListener(
-				new OnClickListener()
-				{
-					public void onClick(View v) {
-						AutoClose=false;
-					}
-				}
-		);
-		
-		ButtonExecClose = (Button)findViewById(R.id.ButtonExecClose);
-		ButtonExecClose.setOnClickListener(
-				new OnClickListener()
-				{
-					public void onClick(View v) {
-						executeThread.stop();
-						setResult(Activity.RESULT_OK);
-						finish();
-					}
-				}
-		);
-		
+
+		EditTextTerm.setOnClickListener(new OnClickListener() {
+			public void onClick(View v) {
+				AutoClose = false;
+			}
+		});
+
+		ButtonExecClose = (Button) findViewById(R.id.ButtonExecClose);
+		ButtonExecClose.setOnClickListener(new OnClickListener() {
+			public void onClick(View v) {
+				executeThread.stop();
+				setResult(Activity.RESULT_OK);
+				finish();
+			}
+		});
+
 		try {
 
 			String Script = eCursor.getString(2);
+			processScript = Script;
+
 			short Su = eCursor.getShort(3);
 
 			processName = "sh";
 
-			switch (Su) 
-			{
+			switch (Su) {
 			case 0:
 				processName = "sh";
 				break;
@@ -128,148 +112,132 @@ public class GScriptExec extends Activity {
 				break;
 			}
 
-			// Create temporary file
-			
-			FileWriter fileOutput = new FileWriter(GScript_TempFile);
-			fileOutput.write(Script);
-			fileOutput.flush();
-			fileOutput.close();
-
 			executeThread = new ExecuteThread();
-			executeThread.GScript_TempFile = GScript_TempFile;
 			executeThread.start();
 
 		} catch (Exception e) {
 			EditTextTerm.setText("Error: \n\n" + e.getMessage());
-		}		
+		}
 
 	}
 
 	Boolean AutoClose = true;
 	int AutoCloseSeconds = 3;
 	Timer AutoCloseTimer = new Timer();
-	class AutoCloseTimerTask extends TimerTask
-	{
+
+	class AutoCloseTimerTask extends TimerTask {
 		@Override
-		public void run() 
-		{
-			if(AutoClose)
-			{
-			AutoCloseSeconds--;
-			messageHandler.sendMessage(Message.obtain(messageHandler, ExecuteUpdateButton, "Close ( Auto closing in " + AutoCloseSeconds + " seconds )")); 
-			
-			if(AutoCloseSeconds==0)
-			{
-				executeThread.stop();
-				setResult(Activity.RESULT_OK);
-				finish();
-			}
+		public void run() {
+			if (AutoClose) {
+				AutoCloseSeconds--;
+				messageHandler.sendMessage(Message.obtain(messageHandler,
+						ExecuteUpdateButton, "Close ( Auto closing in "
+								+ AutoCloseSeconds + " seconds )"));
+
+				if (AutoCloseSeconds == 0) {
+					executeThread.stop();
+					setResult(Activity.RESULT_OK);
+					finish();
+				}
 			} else {
-				messageHandler.sendMessage(Message.obtain(messageHandler, ExecuteUpdateButton, "Close ( Auto closing canceled )"));
+				messageHandler
+						.sendMessage(Message.obtain(messageHandler,
+								ExecuteUpdateButton,
+								"Close ( Auto closing canceled )"));
 				this.cancel();
 			}
 		}
 	}
-	
+
 	private Handler messageHandler = new Handler() {
-	    
+
 		@Override
-		public void handleMessage(Message msg) 
-		{
-	    	  if(msg.what==ExecuteResponse)
-	    	  {
+		public void handleMessage(Message msg) {
+			if (msg.what == ExecuteResponse) {
 				EditTextTerm.setText(msg.obj.toString() + "\n");
-				EditTextTerm.scrollTo(0, EditTextTerm.getLineCount()*EditTextTerm.getLineHeight());
-	    	  }
-	    	  if(msg.what==ExecuteFinished)
-	    	  {
+				EditTextTerm.scrollTo(0, EditTextTerm.getLineCount()
+						* EditTextTerm.getLineHeight());
+			}
+			if (msg.what == ExecuteFinished) {
 
-	    		EditTextTerm.setText(EditTextTerm.getText().toString()+"\nScript finished!");
-				EditTextTerm.scrollTo(0, EditTextTerm.getLineCount()*EditTextTerm.getLineHeight());
-				
+				EditTextTerm.setText(EditTextTerm.getText().toString()
+						+ "\nScript finished!");
+				EditTextTerm.scrollTo(0, EditTextTerm.getLineCount()
+						* EditTextTerm.getLineHeight());
+
 				AutoCloseTimer.schedule(new AutoCloseTimerTask(), 1000, 1000);
-	    	  }
-	    	  if(msg.what==ExecuteUpdateButton)
-	    	  {
-	    		ButtonExecClose.setText(msg.obj.toString());
-	    	  }
-		 	  
-	    	  super.handleMessage(msg);
-		}
-
-	  };	
-	
-	class ExecuteThread extends Thread {
-
-	public String GScript_TempFile;
-		
-	public void run() {
-		Execute();
-	}
-
-	void Execute() {
-		try {
-			messageHandler.sendMessage(Message.obtain(messageHandler, ExecuteResponse, "Thread started")); 
-			
-			Class<?> execClass = Class.forName("android.os.Exec");
-			Method createSubprocess = execClass.getMethod("createSubprocess",
-					String.class, String.class, String.class, int[].class);
-			Method waitFor = execClass.getMethod("waitFor", int.class);
-
-			
-			int[] pid = new int[1];
-			FileDescriptor fd = (FileDescriptor) createSubprocess.invoke(null,
-					"/system/bin/" + processName, this.GScript_TempFile, null, pid);
-
-			FileInputStream in = new FileInputStream(fd);
-			BufferedReader reader = new BufferedReader(
-					new InputStreamReader(in));
-			
-			String output = "";
-			
-			try {
-				String line;
-				while ((line = reader.readLine()) != null) {
-					output += line + "\n";
-					messageHandler.sendMessage(Message.obtain(messageHandler, ExecuteResponse, output)); 
-				}
-
-			} catch (IOException e) {
+			}
+			if (msg.what == ExecuteUpdateButton) {
+				ButtonExecClose.setText(msg.obj.toString());
 			}
 
-			waitFor.invoke(null, pid[0]);
+			super.handleMessage(msg);
+		}
 
-			messageHandler.sendMessage(Message.obtain(messageHandler, ExecuteFinished, "")); 
-			
-			FileOutputStream out = new FileOutputStream(fd);
-			BufferedWriter writer = new BufferedWriter(
-					new OutputStreamWriter(out));
-			
-			writer.write("exit \n");
-						
-			writer.close();
-			reader.close();
-			
-			out.close();
-			in.close();
-			
-			
-		} catch (ClassNotFoundException e) {
-			throw new RuntimeException(e.getMessage());
-		} catch (SecurityException e) {
-			throw new RuntimeException(e.getMessage());
-		} catch (NoSuchMethodException e) {
-			throw new RuntimeException(e.getMessage());
-		} catch (IllegalArgumentException e) {
-			throw new RuntimeException(e.getMessage());
-		} catch (IllegalAccessException e) {
-			throw new RuntimeException(e.getMessage());
-		} catch (InvocationTargetException e) {
-			throw new RuntimeException(e.getMessage());
-		} catch (IOException e) {
+	};
+
+	class ExecuteThread extends Thread {
+
+		public void run() {
+			Execute();
+		}
+
+		void Execute() {
+
+			messageHandler.sendMessage(Message.obtain(messageHandler,
+					ExecuteResponse, "Script executing started..."));
+
+			Process process = null;
+			DataOutputStream outputstream = null;
+			DataInputStream inputstream = null;
+
+			try {
+
+				process = Runtime.getRuntime().exec(processName);
+				outputstream = new DataOutputStream(process.getOutputStream());
+				inputstream = new DataInputStream(process.getInputStream());
+
+				outputstream.writeBytes(processScript + " \n");
+				outputstream.writeBytes("exit\n");
+				outputstream.flush();
+
+				String output = "";
+
+				try {
+					String line;
+					while ((line = inputstream.readLine()) != null) {
+						output += line + "\n";
+						messageHandler.sendMessage(Message.obtain(
+								messageHandler, ExecuteResponse, output));
+					}
+
+				} catch (IOException e) {
+					messageHandler.sendMessage(Message.obtain(messageHandler,
+							ExecuteResponse,
+							"Error while trying to read input stream..."));
+				}
+
+				process.waitFor();
+
+			} catch (Exception e) {
+				messageHandler.sendMessage(Message.obtain(messageHandler,
+						ExecuteResponse, "Error while trying to execute.."));
+			} finally {
+				try {
+					if (outputstream != null)
+						outputstream.close();
+					if (inputstream != null)
+						inputstream.close();
+				} catch (IOException e) {
+				}
+				
+				process.destroy();
+				
+				messageHandler.sendMessage(Message.obtain(messageHandler,
+						ExecuteFinished, ""));
+			}
+
 		}
 
 	}
-
-}
 }
