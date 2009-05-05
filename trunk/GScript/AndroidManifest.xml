@@ -13,7 +13,7 @@
         </activity>
     <activity android:name="GScriptAdd" android:label="@string/app_name"></activity>
     <activity android:name="GScriptEdit" android:label="@string/app_name"></activity>
-	<activity android:name="GScriptExec" android:label="@string/app_name"></activity>
+	<activity android:name="GScriptExec" android:label="@string/app_name" android:screenOrientation="portrait"></activity>
 	<activity android:name="GScriptLoad" android:label="@string/app_name"></activity>
 	
         <activity-alias android:name=".CreateShortcuts"

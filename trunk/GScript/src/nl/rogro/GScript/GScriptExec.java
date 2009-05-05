@@ -1,8 +1,10 @@
 package nl.rogro.GScript;
 
+import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.Timer;
 import java.util.TimerTask;
 import android.app.Activity;
@@ -28,11 +30,11 @@ public class GScriptExec extends Activity {
 	int ExecuteFinished = 1000;
 	int ExecuteUpdateButton = 1001;
 
-	String processName;
-	String processScript;
-	Button ButtonExecClose;
-	EditText EditTextTerm;
-
+	String processName = "";
+	String processScript = "";
+	Button ButtonExecClose = null;
+	EditText EditTextTerm = null;
+	
 	/** Database */
 	protected static class DatabaseHelper extends SQLiteOpenHelper {
 		public DatabaseHelper(Context context) {
@@ -78,6 +80,8 @@ public class GScriptExec extends Activity {
 		eCursor.moveToFirst();
 
 		EditTextTerm = (EditText) findViewById(R.id.EditTextTerm);
+		
+		EditTextTerm.setVerticalScrollBarEnabled(true);
 
 		EditTextTerm.setOnClickListener(new OnClickListener() {
 			public void onClick(View v) {
@@ -88,7 +92,14 @@ public class GScriptExec extends Activity {
 		ButtonExecClose = (Button) findViewById(R.id.ButtonExecClose);
 		ButtonExecClose.setOnClickListener(new OnClickListener() {
 			public void onClick(View v) {
+
 				executeThread.stop();
+				
+				try
+				{
+					process.destroy();
+				} catch(Exception e){}
+				
 				setResult(Activity.RESULT_OK);
 				finish();
 			}
@@ -101,6 +112,10 @@ public class GScriptExec extends Activity {
 
 			short Su = eCursor.getShort(3);
 
+			eCursor.close();
+			mDatabase.close();
+			hlp.close();
+			
 			processName = "sh";
 
 			switch (Su) {
@@ -112,6 +127,11 @@ public class GScriptExec extends Activity {
 				break;
 			}
 
+			scriptOutput = "";
+
+			EditTextTerm.setDrawingCacheEnabled(false);
+			EditTextTerm.setText("Script execution started.");
+			
 			executeThread = new ExecuteThread();
 			executeThread.start();
 
@@ -136,6 +156,12 @@ public class GScriptExec extends Activity {
 
 				if (AutoCloseSeconds == 0) {
 					executeThread.stop();
+
+					try
+					{
+						process.destroy();
+					} catch(Exception e){}					
+					
 					setResult(Activity.RESULT_OK);
 					finish();
 				}
@@ -153,20 +179,29 @@ public class GScriptExec extends Activity {
 
 		@Override
 		public void handleMessage(Message msg) {
+			
 			if (msg.what == ExecuteResponse) {
-				EditTextTerm.setText(msg.obj.toString() + "\n");
-				EditTextTerm.scrollTo(0, EditTextTerm.getLineCount()
-						* EditTextTerm.getLineHeight());
+
+				if(scriptOutput.length() > 500)
+				{
+					scriptOutput = scriptOutput.substring(scriptOutput.length()-500, scriptOutput.length());
+				}
+				
+				String termText = scriptOutput;
+
+				if(EditTextTerm.getText().toString()!=termText)
+					EditTextTerm.setText(termText);
+				
 			}
+			
 			if (msg.what == ExecuteFinished) {
 
 				EditTextTerm.setText(EditTextTerm.getText().toString()
 						+ "\nScript finished!");
-				EditTextTerm.scrollTo(0, EditTextTerm.getLineCount()
-						* EditTextTerm.getLineHeight());
 
 				AutoCloseTimer.schedule(new AutoCloseTimerTask(), 1000, 1000);
 			}
+			
 			if (msg.what == ExecuteUpdateButton) {
 				ButtonExecClose.setText(msg.obj.toString());
 			}
@@ -176,67 +211,135 @@ public class GScriptExec extends Activity {
 
 	};
 
+	DataOutputStream stdin = null;
+	DataInputStream stdout = null;
+	DataInputStream stderr = null;
+	
+	String scriptOutput = "";
+	Boolean scriptRunning = false;
+	Boolean stdoutFinished = false;
+	Boolean stderrFinished = false;
+
+	Thread stdoutThread = null;
+	Thread stderrThread = null;
+	Thread stdinThread = null;
+
+	Process process = null;
+	
 	class ExecuteThread extends Thread {
 
 		public void run() {
+			super.setPriority(MIN_PRIORITY);
 			Execute();
 		}
 
 		void Execute() {
 
-			messageHandler.sendMessage(Message.obtain(messageHandler,
-					ExecuteResponse, "Script executing started..."));
-
-			Process process = null;
-			DataOutputStream outputstream = null;
-			DataInputStream inputstream = null;
-
 			try {
-
+			
 				process = Runtime.getRuntime().exec(processName);
-				outputstream = new DataOutputStream(process.getOutputStream());
-				inputstream = new DataInputStream(process.getInputStream());
-
-				outputstream.writeBytes(processScript + " \n");
-				outputstream.writeBytes("exit\n");
-				outputstream.flush();
-
-				String output = "";
-
-				try {
-					String line;
-					while ((line = inputstream.readLine()) != null) {
-						output += line + "\n";
-						messageHandler.sendMessage(Message.obtain(
-								messageHandler, ExecuteResponse, output));
+				
+				stdin = new DataOutputStream(process.getOutputStream());
+				stdout = new DataInputStream(process.getInputStream());
+				stderr = new DataInputStream(process.getErrorStream());				
+				
+				stdinThread = new Thread()
+				{
+					public void run()
+					{
+						super.setPriority(MIN_PRIORITY);
+						
+						while(scriptRunning)
+						{
+							try
+							{
+								
+							super.sleep(200);
+								
+							messageHandler.sendMessage(Message.obtain(messageHandler,
+									ExecuteResponse, ""));
+							} catch(Exception e) {}
+						}
 					}
+				};
+				
+				stdoutThread = new Thread(){
+					public void run()
+					{						
+						super.setPriority(MIN_PRIORITY);
+						
+						try
+						{
+							String line;
+							while((line = stdout.readLine())!=null)
+							{
+								super.sleep(10);
+								scriptOutput+=line+"\n";
+							}
+							stdoutFinished = true;
+							
+						} catch(Exception e){}
+					}
+				};
+				stderrThread = new Thread(){
+					public void run()
+					{
+						super.setPriority(MIN_PRIORITY);
+						
+						try
+						{
+						String line;
+						while((line = stderr.readLine())!=null)
+						{
+							super.sleep(10);
+							scriptOutput+="stderr: " + line+"\n";
+						}
+						
+						stderrFinished = true;
+						
+						} catch(Exception e){}
+					}
+				};
 
-				} catch (IOException e) {
-					messageHandler.sendMessage(Message.obtain(messageHandler,
-							ExecuteResponse,
-							"Error while trying to read input stream..."));
-				}
+				scriptRunning=true;
+				
+				stdoutThread.start();
+				stderrThread.start();
+				stdinThread.start();
+				
+				stdin.writeBytes(processScript + " \n");
+				stdin.writeBytes("exit\n");
+				
+				stdin.flush();
 
 				process.waitFor();
+				
+				while(!stdoutFinished || !stderrFinished)
+				{
+				}
+				
+				stderr.close();
+				stdout.close();
+				stdin.close();
+				
+				stdoutThread = null;
+				stderrThread = null;
+				stdinThread = null;
+				
+				messageHandler.sendMessage(Message.obtain(messageHandler,
+						ExecuteResponse, ""));
+				
+				scriptRunning = false;
 
+				process.destroy();				
+
+				messageHandler.sendMessage(Message.obtain(messageHandler,
+						ExecuteFinished, ""));
+				
 			} catch (Exception e) {
 				messageHandler.sendMessage(Message.obtain(messageHandler,
 						ExecuteResponse, "Error while trying to execute.."));
-			} finally {
-				try {
-					if (outputstream != null)
-						outputstream.close();
-					if (inputstream != null)
-						inputstream.close();
-				} catch (IOException e) {
-				}
-				
-				process.destroy();
-				
-				messageHandler.sendMessage(Message.obtain(messageHandler,
-						ExecuteFinished, ""));
 			}
-
 		}
 
 	}
