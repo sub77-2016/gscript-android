@@ -1,3 +1,4 @@
+#labels Featured
 If you want to edit a script long press the desired script in the main window.
 
 A dialog window will open giving you the following options:
