@@ -1,0 +1,1 @@
+A small application that allows the saving/editing and running of shell scripts from within Android.
